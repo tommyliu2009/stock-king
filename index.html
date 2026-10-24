@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-7374EDFKBH"></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-7374EDFKBH');</script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>股票王｜台股與全球股市公開資訊整理</title>
+<meta name="description" content="股票王：整理證交所、櫃買中心、公開資訊觀測站公開資料，每日更新台股收盤、本益比、殖利率、三大法人、月營收與重大訊息。本站為公開資訊整理，不構成投資建議。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📈</text></svg>">
+<link rel="stylesheet" href="style.css?v=202610241430">
+
+<!--GEO-->
+<link rel="canonical" href="https://web5.subsidyking.tw/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="股票王">
+<meta property="og:locale" content="zh_TW">
+<meta property="og:title" content="股票王｜台股與全球股市公開資訊整理">
+<meta property="og:description" content="股票王：整理證交所、櫃買中心、公開資訊觀測站公開資料，每日更新台股收盤、本益比、殖利率、三大法人、月營收與重大訊息。本站為公開資訊整理，不構成投資建議。">
+<meta property="og:url" content="https://web5.subsidyking.tw/">
+<meta name="twitter:card" content="summary"><meta name="twitter:title" content="股票王｜台股與全球股市公開資訊整理"><meta name="twitter:description" content="股票王：整理證交所、櫃買中心、公開資訊觀測站公開資料，每日更新台股收盤、本益比、殖利率、三大法人、月營收與重大訊息。本站為公開資訊整理，不構成投資建議。">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://web5.subsidyking.tw/#org","name":"仁禾管理顧問","url":"https://web5.subsidyking.tw/","email":"renhe74123@gmail.com","contactPoint":{"@type":"ContactPoint","contactType":"customer service","email":"renhe74123@gmail.com","availableLanguage":["zh-TW"]},"sameAs":["https://line.me/R/ti/p/@891tcxhu"]},{"@type":"WebSite","@id":"https://web5.subsidyking.tw/#website","url":"https://web5.subsidyking.tw/","name":"股票王","description":"本網站專注於整理上市櫃公司的公開資訊，提供使用者快速查閱之便利。所有內容僅屬資訊彙整，並不構成任何投資建議，使用者應自行判斷與決策。","inLanguage":"zh-Hant-TW","publisher":{"@id":"https://web5.subsidyking.tw/#org"}},{"@type":"WebPage","@id":"https://web5.subsidyking.tw/#webpage","url":"https://web5.subsidyking.tw/","name":"股票王｜台股與全球股市公開資訊整理","isPartOf":{"@id":"https://web5.subsidyking.tw/#website"},"dateModified":"2026-10-24","about":"上市櫃公開資訊整理"}]}</script><!--/GEO-->
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <div class="brand"><a href="#/" style="text-decoration:none;display:flex;gap:8px;align-items:center"><span class="logo">📈</span><span>股票王--仁禾管理顧問</span></a></div>
+    <h1>台股與全球股市公開資訊整理</h1>
+    <p class="sub">整理證交所、櫃買中心、公開資訊觀測站的官方公開資料，以及美、日、港、歐、英主要指數成分股與匯率（Yahoo Finance 公開報價，延遲約 15–20 分鐘），每天更新 5 次。</p>
+    <div class="searchbar">
+      <input id="q" type="search" placeholder="輸入股票代號或名稱（例：2330、台積電、AAPL、輝達、7203、騰訊）" autocomplete="off" enterkeyhint="search">
+      <button id="qBtn" type="button" class="qbtn">搜尋</button>
+      <div id="sugg" class="sugg" hidden></div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="disc">⚠ 本站為公開資訊整理，不構成投資建議。資料以證交所、櫃買中心及公開資訊觀測站公告為準。</div>
+  </div>
+</header>
+<style>.mtop{display:none}@media (max-width:860px){.mtop{display:block;margin:10px 12px 0;padding:7px 10px;border:2px solid #f08a24;border-radius:10px;background:#fff7ee;text-align:center;line-height:1.45;font-size:.82rem}.mtop b{color:#d2691e}.mtop a{color:#d2691e;word-break:break-all}}</style>
+<div class="mtop" id="mobileAd"><b>仁禾管理顧問</b><br><a href="mailto:renhe74123@gmail.com">renhe74123@gmail.com</a>｜<a href="https://line.me/R/ti/p/@891tcxhu" target="_blank" rel="noopener">LINE 官方帳號：@891tcxhu</a></div>
+<main class="wrap layout">
+  <aside class="filters" id="filters">
+    <div class="fhead"><h2>選股篩選</h2><button class="link" id="reset">清除全部</button></div>
+    <div class="fgroup"><h3>市場</h3><div class="chips" id="fm"></div></div>
+    <div class="fgroup"><h3>殖利率（%）</h3><div class="rng"><input id="dy1" inputmode="decimal" placeholder="最低">～<input id="dy2" inputmode="decimal" placeholder="最高"></div></div>
+    <div class="fgroup"><h3>本益比</h3><div class="rng"><input id="pe1" inputmode="decimal" placeholder="最低">～<input id="pe2" inputmode="decimal" placeholder="最高"></div></div>
+    <div class="fgroup"><h3>月營收年增率（%）</h3><div class="rng"><input id="ry1" inputmode="decimal" placeholder="最低">～<input id="ry2" inputmode="decimal" placeholder="最高"></div></div>
+    <div class="fgroup"><h3>產業</h3><select id="fi"><option value="">全部產業</option></select></div>
+    <button class="btn primary only-mobile" id="applyFilters">查看結果</button>
+    <div class="ad">
+      <div class="ad-name">仁禾管理顧問</div>
+      <div class="ad-contact"><a href="mailto:renhe74123@gmail.com">renhe74123@gmail.com</a><br><a href="https://line.me/R/ti/p/@891tcxhu" target="_blank" rel="noopener">LINE 官方帳號：@891tcxhu</a></div>
+    </div>
+    <div class="counter">訪客人次<br><img src="https://visitor-badge.laobi.icu/badge?page_id=tommyliu2009.stock-king&left_text=%E8%A8%AA%E5%AE%A2&left_color=%23d2691e&right_color=%23f08a24" alt="訪客計數器"></div>
+  </aside>
+  <section class="results" id="main">載入中…</section>
+</main>
+<footer class="foot"><div class="wrap">
+  <p class="mad">仁禾管理顧問｜<a href="mailto:renhe74123@gmail.com">renhe74123@gmail.com</a>｜<a href="https://line.me/R/ti/p/@891tcxhu" target="_blank" rel="noopener">LINE 官方帳號：@891tcxhu</a></p>
+  <p id="foot"></p>
+  <p class="muted">本站為公開資訊整理，不構成投資建議，不提供個股買賣建議。資料來源：臺灣證券交易所 OpenAPI、證券櫃檯買賣中心 OpenAPI、公開資訊觀測站（政府資料開放平臺 18415、18418、11547 等）；全球市場報價來自 Yahoo Finance 公開資料（延遲報價），成分股清單來自 Wikipedia、Nasdaq、香港交易所公開清單。</p>
+</div></footer>
+<script src="app.js?v=202610241430"></script>
+<!--MX:about--><section class="mx-box mx-about" id="about-data" aria-label="關於本站與資料來源"><h2>關於本站與資料來源</h2><p style="margin:0">本網站專注於整理上市櫃公司的公開資訊，提供使用者快速查閱之便利。所有內容僅屬資訊彙整，並不構成任何投資建議，使用者應自行判斷與決策。</p><p style="margin:4px 0 0;color:#777">本頁資料更新：2026-10-24</p></section><!--/MX:about--><!--MX:footer--><style>.mx-box{max-width:1100px;margin:24px auto 0;padding:14px 16px;box-sizing:border-box;font-size:14px;line-height:1.7;color:#333;border-top:1px solid #ddd}.mx-box h2{font-size:15px;margin:0 0 6px;color:#222}.mx-box ul{margin:0;padding-left:18px}.mx-box a{color:#1a5fb4}.mx-cta{display:inline-block;margin-top:8px;padding:6px 14px;background:#c0392b;color:#fff!important;border-radius:16px;text-decoration:none;font-weight:bold}.mx-fab{position:fixed;right:14px;bottom:16px;z-index:9990;padding:10px 16px;background:#c0392b;color:#fff!important;border-radius:22px;box-shadow:0 2px 8px rgba(0,0,0,.25);text-decoration:none;font-weight:bold;font-size:15px}@media print{.mx-fab{display:none}}</style><aside class="mx-box mx-related" aria-label="相關網站"><h2>相關網站</h2><ul><li><a href="https://www.bidking.tw/">標案王</a>｜政府標案查詢與關鍵字電子報</li><li><a href="https://web6.subsidyking.tw/">全球產業新聞網</a>｜台灣與國際產業趨勢新聞</li><li><a href="https://www.subsidyking.tw/">補助王</a>｜全台政府補助資料庫</li><li><a href="https://web18.subsidyking.tw/?utm_source=web5.subsidyking.tw&utm_medium=matrix">仁禾管理顧問</a>｜補助申請與標案備標顧問、問診預約</li></ul><a class="mx-cta" href="https://line.me/R/ti/p/@891tcxhu" target="_blank" rel="noopener" onclick="if(window.gtag)gtag('event','click_consult',{site:'web5.subsidyking.tw'})">免費問診預約（LINE 官方帳號）</a></aside><!--/MX:footer-->
+</body></html>
