@@ -157,13 +157,71 @@ function dayLag(d,maxDay){if(!d||!/^\d{4}-\d{2}-\d{2}$/.test(d))return '狀態�
 function srcLinks(parts){return parts.filter(Boolean).map(([n,u])=>`<a href="${esc(u)}" target="_blank" rel="noopener">${esc(n)}</a>`).join('、')}
 function idxLinks(x){const y=`https://finance.yahoo.com/quote/${encodeURIComponent(x.c)}`;const file='data/gidx.json';const bits=[['本站指數檔',file],['Yahoo Finance 代號頁',y]];if(x.c==='^TWII'||x.src==='TWSE')bits.push(['臺灣證券交易所','https://www.twse.com.tw/']);return srcLinks(bits)}
 function idxSourceText(x){const bits=[];bits.push(x.src?`src「${x.src}」`:'src 未提供');bits.push(x.st?`盤別「${x.st}」`:'盤別未提供');if(x.k==='fx')bits.push('匯率沿用全球頁說明：Yahoo Finance 公開報價，非即時');else if(x.src==='TWSE')bits.push('此筆標 TWSE；其他指數為 Yahoo 代號，全球頁說明來自 Yahoo Finance，非即時');else bits.push('全球頁說明此類報價來自 Yahoo Finance，延遲而非即時');return bits.join('。')+'。'}
-function dkSpark(h){if(!Array.isArray(h)||h.length<2)return `<p class="dk-gap">走勢未提供（資料點 ${Array.isArray(h)?h.length:0}，不足 2 點，不繪製）</p>`;const ys=h.map(r=>+r[1]).filter(v=>!isNaN(v));if(ys.length<2)return '<p class="dk-gap">走勢未提供（價格欄不足，不繪製）</p>';const mn=Math.min(...ys),mx=Math.max(...ys),rg=mx-mn||1,w=320,hh=48;const pts=h.map((r,i)=>`${(i*(w)/(h.length-1)).toFixed(1)},${(3+(hh-6)*(1-((+r[1])-mn)/rg)).toFixed(1)}`).join(' ');const up=ys[ys.length-1]>=ys[0];const cap=`走勢 ${h[0][0]} 至 ${h[h.length-1][0]}，${h.length} 點`;return `<div class="dk-spark"><svg role="img" aria-label="${esc(cap+'，起 '+ys[0]+' 迄 '+ys[ys.length-1]+'。線色只比較區間起迄，不是當日漲跌。')}" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none"><polyline fill="none" stroke="${ys[ys.length-1]===ys[0]?'#868e96':up?'#e03131':'#2b8a3e'}" stroke-width="2" points="${pts}"/></svg><p class="dk-meta">${esc(cap)}。最高 ${fx(mx)}、最低 ${fx(mn)}。線色只比較區間起迄，不是當日漲跌。</p></div>`}
+const TONES=['amber','orange','teal','blue','purple','magenta','red'];
+const TONEB=['amber','orange','teal','blue','purple','magenta','red'];
+function toneAt(i){return TONES[((i%TONES.length)+TONES.length)%TONES.length]}
+function dirBits(cp,ch){
+  if(cp==null||cp===''||isNaN(+cp))return {cls:'',text:'漲跌未提供'};
+  const word=+cp>0?'漲':+cp<0?'跌':'平';
+  const extra=ch==null||ch===''||isNaN(+ch)?'':`（${sg(ch)}）`;
+  return {cls:cls(+cp),text:`${word} ${sg(+cp)}%${extra}`};
+}
+function dkSpark(h,opt){
+  opt=opt||{};
+  const hh=opt.h||64,w=320;
+  if(!Array.isArray(h)||h.length<2)return `<p class="dk-gap">走勢未提供（資料點 ${Array.isArray(h)?h.length:0}，不足 2 點，不繪製）</p>`;
+  const ys=h.map(r=>+r[1]);
+  if(ys.some(v=>!isFinite(v)))return '<p class="dk-gap">走勢未提供（價格欄不足，不繪製）</p>';
+  const mn=Math.min(...ys),mx=Math.max(...ys),rg=mx-mn||1;
+  const coords=h.map((r,i)=>[i*w/(h.length-1), 4+(hh-10)*(1-((+r[1])-mn)/rg)]);
+  const line=coords.map(p=>`${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
+  const up=ys[ys.length-1]>ys[0], flat=ys[ys.length-1]===ys[0];
+  const stroke=flat?'#64748b':up?'#e03131':'#2b8a3e';
+  const fill=flat?'rgba(100,116,139,.16)':up?'rgba(224,49,49,.18)':'rgba(43,138,62,.18)';
+  const cap=`走勢 ${h[0][0]} 至 ${h[h.length-1][0]}，${h.length} 點。最高 ${fx(mx)}、最低 ${fx(mn)}。紅線＝區間收高，綠線＝區間收低。`;
+  const svg=`<svg role="img" aria-label="${esc(cap)}" viewBox="0 0 ${w} ${hh}" preserveAspectRatio="none" style="height:${hh}px"><polygon fill="${fill}" points="0,${hh} ${line} ${w},${hh}"/><polyline fill="none" stroke="${stroke}" stroke-width="2.2" points="${line}"/></svg>`;
+  if(opt.mini)return `<div class="dk-spark dk-spark-mini" style="height:${hh}px">${svg}</div>`;
+  return `<div class="dk-spark">${svg}<p class="dk-meta">${esc(cap)}</p></div>`;
+}
+function winMoves(h){
+  if(!Array.isArray(h)||h.length<2)return [];
+  const specs=[[5,'近5個交易日'],[21,'近21個交易日'],[60,'近60個交易日'],[h.length-1,'檔內全區間']];
+  return specs.map(([n,label])=>{
+    if(h.length-1<n)return {label,text:'未提供',cls:'',note:'點數不足'};
+    const i=h.length-1-n,a=+h[i][1],b=+h[h.length-1][1];
+    if(!isFinite(a)||!isFinite(b)||a===0)return {label,text:'未提供',cls:'',note:'價格不足'};
+    const p=(b-a)/a*100;
+    const d=dirBits(p);
+    return {label,text:d.text,cls:d.cls,note:`${h[i][0]}→${h[h.length-1][0]}`};
+  });
+}
+function rangePos(h){
+  if(!Array.isArray(h)||h.length<2)return '區間位置未提供。';
+  const ys=h.map(r=>+r[1]).filter(v=>isFinite(v));
+  if(ys.length<2)return '區間位置未提供。';
+  const mn=Math.min(...ys),mx=Math.max(...ys),last=ys[ys.length-1];
+  if(mx===mn)return '檔內最高與最低相同，區間位置未提供。';
+  return `檔內高低的相對位置 ${fx((last-mn)/(mx-mn)*100,0)}%（最低 ${fx(mn)}、最高 ${fx(mx)}）。只描述這段收盤價，不是指標。`;
+}
+function quoteFoot(x,built,maxDay){
+  const when=`資料交易日 ${esc(x.d||'未提供')}${x.tz?'（'+esc(tzl(x.tz))+'時間）':'（時區未提供）'}。抓取時間 ${esc(built||'未提供')}（台北）。`;
+  return `<p class="dk-meta">${when}</p><p class="dk-meta">${esc(dayLag(x.d,x.k==='idx'?maxDay:''))}</p><p class="dk-meta">來源：${idxLinks(x)}。</p><details><summary>來源說明</summary><p class="dk-meta">${esc(idxSourceText(x))}</p></details>`;
+}
 function spreadText(rows,pick){const c={};rows.forEach(x=>{const k=pick(x)||'未提供';c[k]=(c[k]||0)+1});return Object.keys(c).sort((a,b)=>a<b?1:a>b?-1:0).map(k=>`${k}（${c[k]} 檔）`).join('、')||'未提供'}
 function ad3(){return `<p class="ad3"><span>仁禾管理顧問</span><a href="mailto:renhe74123@gmail.com">renhe74123@gmail.com</a><a href="https://line.me/R/ti/p/@891tcxhu" target="_blank" rel="noopener">LINE 官方帳號：@891tcxhu</a></p>`}
 function dashView(m){const draw=()=>{if(tab!=='dash')return;m.innerHTML=tabs()+dashboardHtml();bindDash()};if(GX||GX_ERR)return draw();m.innerHTML=tabs()+'<p class="count">市場主控台載入中…</p>';fetch('data/gidx.json?v='+encodeURIComponent(D.meta.built)).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}).then(j=>{GX=j;GX_ERR=false}).catch(()=>{GX=null;GX_ERR=true}).then(()=>{if(tab==='dash')draw()})}
-function dashboardHtml(){const meta=D.meta,g=meta.g||{},idx=GX&&Array.isArray(GX.x)?GX.x.filter(x=>x.k==='idx'):[],fxs=GX&&Array.isArray(GX.x)?GX.x.filter(x=>x.k==='fx'):[],maxDay=idx.map(x=>x.d).filter(Boolean).sort().at(-1)||'';const news=Array.isArray(D.news)?D.news:[];const newsDays=[...new Set(news.map(z=>z.d).filter(Boolean))].sort();const byInd={};let unmatched=0;news.forEach(z=>{const x=M[z.c];const name=x&&x.i?x.i:'';if(!name)unmatched++;const k=name||'未提供';(byInd[k]||(byInd[k]=[])).push(z)});const indRows=Object.keys(byInd).sort((a,b)=>byInd[b].length-byInd[a].length);const companies=new Set(news.map(z=>z.c));const missP=S.filter(x=>x.p==null).length;const gBuilt=(GX&&GX.built)||g.built||'';const qAge=ageNote(meta.built),gAge=gBuilt?ageNote(gBuilt):'全球檔抓取時間未提供。';
+function dashboardHtml(){
+  const meta=D.meta,g=meta.g||{},idx=GX&&Array.isArray(GX.x)?GX.x.filter(x=>x.k==='idx'):[],fxs=GX&&Array.isArray(GX.x)?GX.x.filter(x=>x.k==='fx'):[],maxDay=idx.map(x=>x.d).filter(Boolean).sort().at(-1)||'';
+  const news=Array.isArray(D.news)?D.news:[];
+  const newsDays=[...new Set(news.map(z=>z.d).filter(Boolean))].sort();
+  const byInd={};let unmatched=0;
+  news.forEach(z=>{const x=M[z.c];const name=x&&x.i?x.i:'';if(!name)unmatched++;const k=name||'未提供';(byInd[k]||(byInd[k]=[])).push(z)});
+  const indRows=Object.keys(byInd).sort((a,b)=>byInd[b].length-byInd[a].length);
+  const companies=new Set(news.map(z=>z.c));
+  const missP=S.filter(x=>x.p==null).length;
+  const gBuilt=(GX&&GX.built)||g.built||'';
+  const qAge=ageNote(meta.built),gAge=gBuilt?ageNote(gBuilt):'全球檔抓取時間未提供。';
   const lagIdx=idx.filter(x=>x.d&&maxDay&&x.d<maxDay);
-  const kpis=[['重大訊息則數',news.length?fi(news.length):'未提供',news.length?`發言日 ${newsDays.join('、')}`:'資料檔 news 是空的'],['可對到公司產業',news.length?`${fi(news.length-unmatched)} / ${fi(news.length)}`:'未提供',unmatched?`${unmatched} 則沒有公司產業`:'以公告公司的 i 欄對應，不是因果'],['涉及公司數',news.length?fi(companies.size):'未提供','同一公司可有多則公告'],['沒有價格的標的',fi(missP),'這些標的顯示未提供，不補數字'],['指數資料日不一致',lagIdx.length?fi(lagIdx.length)+' 條':'沒有',lagIdx.length?lagIdx.map(x=>x.n).join('、'):'與同檔較新的指數日相比']];
   const gaps=[];
   if(!news.length)gaps.push('重大訊息未提供。');
   else if(newsDays.length===1)gaps.push(`重大訊息只含發言日 ${newsDays[0]}，共 ${news.length} 則。沒有別的日期，頁面不補。`);
@@ -180,17 +238,52 @@ function dashboardHtml(){const meta=D.meta,g=meta.g||{},idx=GX&&Array.isArray(GX
   gaps.push('沒有 AI 分析欄位，本頁不做 AI 解讀。');
   gaps.push('沒有交易所行事曆，只標日期差，不判斷是休市還是來源延遲。');
   if(Array.isArray(meta.fail)&&meta.fail.length)gaps.push('目錄記載部分來源抓取失敗：'+meta.fail.map(f=>f[0]).join('、')+'。');
-  const fresh=`<p class="dk-warn">本頁讀取時間 ${esc(TP_CLOCK)}（台北，${esc(TP_WEEK)}）。個股與重大訊息抓取時間 ${esc(meta.built||'未提供')}（台北）。${esc(qAge)} 全球指數檔抓取時間 ${esc(gBuilt||'未提供')}（台北）。${esc(gAge)} 這些都是已寫入的快照，不是盤中即時。</p>`;
-  const cards=kpis.map(([t,v,s])=>`<article class="dk-kpi"><h3>${esc(t)}</h3><b>${esc(v)}</b><p class="dk-meta">${esc(s)}</p><p class="dk-meta">來源：<a href="data/all.json">data/all.json</a>${t.startsWith('指數')?'、<a href="data/gidx.json">data/gidx.json</a>':''}。抓取：${esc(meta.built||'未提供')}（台北）。</p></article>`).join('');
-  const series=(x,digits)=>`<article class="dk-card"><h3>${esc(x.n||'名稱未提供')}</h3><p class="dk-px">${numOrGap(x.p,digits)}</p><p class="${cls(x.cp)}">${x.cp==null?'漲跌未提供':sg(x.cp)+'%'}${x.ch==null?'':`（${sg(x.ch)}）`}</p>${dkSpark(x.h)}<p class="dk-meta">${esc(dayLag(x.d,x.k==='idx'?maxDay:''))}</p><p class="dk-meta">資料交易日 ${esc(x.d||'未提供')}${x.tz?'（'+esc(tzl(x.tz))+'時間）':'（時區未提供）'}。抓取時間 ${esc(gBuilt||'未提供')}（台北）。</p><p class="dk-meta">${esc(idxSourceText(x))}來源：${idxLinks(x)}。</p></article>`;
+  const sorted=news.slice().sort((a,b)=>(b.d||'').localeCompare(a.d||'')||(b.t||'').localeCompare(a.t||''));
+  const strip=sorted.slice(0,5).map((z,i)=>{
+    const sub=(z.s||'主旨未提供').replace(/\s+/g,' ');
+    return `<a class="dk-ev tone-${toneAt(i)}" href="#/s/${encodeURIComponent(z.c)}"><span class="dk-ev-k">公告</span><strong>${esc(z.c)} ${esc(z.n||'')}</strong><span>${esc(sub.slice(0,48))}${sub.length>48?'…':''}</span><small>${esc(z.d||'日期未提供')} ${esc(z.t||'')}・公開資訊觀測站重大訊息，不是國際事件</small></a>`;
+  }).join('')||'<p class="dk-gap">重大訊息未提供，不另寫事件。</p>';
+  const statuses=[
+    ['amber','重大訊息',news.length?fi(news.length)+' 則':'未提供',newsDays.join('、')||'發言日未提供'],
+    ['orange','發言日與收盤日',newsDays.length&&meta.qdate?(newsDays.at(-1)===meta.qdate?'同一天':'發言日較早'):'未提供',`發言日 ${newsDays.at(-1)||'未提供'}／收盤日 ${meta.qdate||'未提供'}`],
+    ['teal','指數資料日',lagIdx.length?lagIdx.length+' 條較早':'沒有較早的','與同檔較新資料日相比'],
+    ['blue','沒有價格',fi(missP)+' 檔','不補數字'],
+    ['red','解讀','沒有 AI','資料檔沒有分析欄位']
+  ];
+  const statusHtml=statuses.map(([t,k,v,s])=>`<article class="dk-note"><span class="dk-tag tone-${t}">${esc(k)}</span><b>${esc(v)}</b><p class="dk-meta">${esc(s)}。來源 data/all.json${k==='指數資料日'?'、data/gidx.json':''}。抓取 ${esc(meta.built||'未提供')}（台北）。</p></article>`).join('');
+  const feat=idx.find(x=>x.c==='^TWII')||idx[0];
+  const rest=idx.filter(x=>x!==feat);
+  const feature=feat?(()=>{
+    const d=dirBits(feat.cp,feat.ch);
+    const moves=winMoves(feat.h).map(m=>`<span class="${m.cls}" title="${esc(m.note)}">${esc(m.label)} ${esc(m.text)}</span>`).join('');
+    return `<article class="dk-feature" id="mkt-h"><span class="dk-kicker">台灣市場</span><h2>${esc(feat.n||'名稱未提供')}</h2><div class="dk-hero-px"><b>${numOrGap(feat.p,2)}</b><span class="dk-badge ${d.cls}">${esc(d.text)}</span></div><div class="dk-moves" aria-label="檔內區間漲跌">${moves}</div><p class="dk-meta">區間漲跌由這條收盤序列計算，不是交易所公布的報酬，也不是買賣訊號。紅漲、綠跌，旁邊有漲／跌與正負號。${esc(rangePos(feat.h))}</p>${dkSpark(feat.h,{h:132})}${quoteFoot(feat,gBuilt,maxDay)}</article>`;
+  })():'<article class="dk-feature" id="mkt-h"><h2>台灣市場</h2><p class="dk-gap">指數未提供。</p></article>';
+  const mini=(x,i,digits)=>`<article class="dk-mini toneb-${toneAt(i)}"><span class="bar" aria-hidden="true"></span><h3>${esc(x.n||'名稱未提供')}</h3><p class="dk-px">${numOrGap(x.p,digits)}</p><p class="dk-badge ${dirBits(x.cp,x.ch).cls}">${esc(dirBits(x.cp,x.ch).text)}</p>${dkSpark(x.h,{h:52,mini:true})}${quoteFoot(x,gBuilt,x.k==='idx'?maxDay:'')}</article>`;
   const mkt=MKS.map(name=>{const rows=S.filter(x=>x.m===name);const global=rows.some(isG);const built=global?(g.built||meta.built):meta.built;const src=name==='上市'?[['臺灣證券交易所','https://www.twse.com.tw/'],['本站目錄','data/all.json']]:name==='上櫃'?[['證券櫃檯買賣中心','https://www.tpex.org.tw/'],['本站目錄','data/all.json']]:[['Yahoo Finance','https://finance.yahoo.com/'],['本站目錄','data/all.json'],['這個市場的清單','#/gm/'+encodeURIComponent(name)]];return `<tr><td class="l">${esc(name)}</td><td class="l">${fi(rows.length)} 檔，有價格 ${fi(rows.filter(x=>x.p!=null).length)}</td><td class="l">${esc(spreadText(rows,x=>x.g?x.d:x.id))}</td><td class="l">${esc(built||'未提供')}（台北）</td><td class="l">${srcLinks(src)}</td></tr>`}).join('');
-  const ev=news.slice().sort((a,b)=>(b.d||'').localeCompare(a.d||'')||(b.t||'').localeCompare(a.t||'')).slice(0,8).map(z=>{const x=M[z.c];const ind=x&&x.i?x.i:'';let how='產業未提供';if(ind){const blob=(z.s||'')+(z.x||'');how=ind.length>=3&&blob.includes(ind)?`公司產業「${ind}」。主旨或內文含相同字樣，這是關鍵字配對，不是因果`:`公司產業分類為「${ind}」。公告文字沒有這串產業名稱，只依公司資料對應，不是因果推論`}return `<article class="news"><div class="m">${esc(z.d||'日期未提供')} ${esc(z.t||'')}・${esc(z.m||'')}・<a href="#/s/${encodeURIComponent(z.c)}">${esc(z.c)} ${esc(z.n||'')}</a></div><p style="margin:4px 0">${esc(z.s||'主旨未提供')}</p><p class="dk-meta">${esc(how)}。來源：<a href="https://mops.twse.com.tw/" target="_blank" rel="noopener">公開資訊觀測站</a>、<a href="data/all.json">data/all.json</a>。資料交易日（發言日）${esc(z.d||'未提供')}。抓取時間 ${esc(meta.built||'未提供')}（台北）。本檔沒有單則公告深連結。</p></article>`}).join('');
-  const indTbl=indRows.slice(0,18).map(i=>`<tr><td class="l">${i==='未提供'?esc(i):`<a href="#/ind/${encodeURIComponent(i)}">${esc(i)}</a>`}</td><td>${fi(byInd[i].length)}</td><td>${fi(new Set(byInd[i].map(z=>z.c)).size)}</td></tr>`).join('');
-  const twInd={};S.filter(x=>!x.g).forEach(x=>{twInd[x.i]=(twInd[x.i]||0)+1});const twTop=Object.keys(twInd).sort((a,b)=>twInd[b]-twInd[a]).slice(0,12).map(i=>`<a class="btn" href="#/ind/${encodeURIComponent(i)}">${esc(i)} <small>${twInd[i]} 檔</small></a>`).join('');
-  const gInd={};S.filter(x=>isG(x)&&!/^[A-Z0-9]{8,}$/.test(x.i||'')).forEach(x=>{gInd[x.i]=(gInd[x.i]||0)+1});const gTop=Object.keys(gInd).sort((a,b)=>gInd[b]-gInd[a]).map(i=>`<a class="btn" href="#/ind/${encodeURIComponent(i)}">${esc(i)} <small>${gInd[i]} 檔</small></a>`).join('');
-  return `<div class="dk"><section class="dk-sec"><h2>股票王市場主控台</h2><p class="dk-lead">資訊彙整，不構成投資建議，不提供買賣點、報酬保證或個人建議。沒有模型產生的解讀；下面的數字都來自既有資料檔，缺的就標未提供。</p>${ad3()}<p class="dk-meta" style="margin-top:8px">選股篩選、個股行情、法人與重大訊息全文仍在上方頁籤。</p>${fresh}</section>
-  <section class="dk-sec" aria-labelledby="ev-h"><h2 id="ev-h">重大事件摘要</h2><p class="dk-lead">這些卡片是公告數量與資料狀態，不是風險評分，也不代表買賣時機。</p><div class="dk-kpis">${cards}</div><div class="dk-warn" style="margin-top:10px"><b>資料缺口</b><ul>${gaps.map(g=>`<li>${esc(g)}</li>`).join('')}</ul></div></section>
-  <section class="dk-sec" aria-labelledby="mkt-h"><h2 id="mkt-h">台灣與全球市場走勢</h2><p class="dk-lead">小圖只畫資料檔裡的收盤序列。點數不足就留白。跨市場日期不同時各自保留，不改成同一天。</p>${GX_ERR?'<p class="dk-err">全球指數檔載入失敗。請稍後重新整理。個股頁籤仍可使用已載入的目錄。</p>':''}${idx.length?`<div class="dk-grid">${idx.map(x=>series(x,2)).join('')}</div>`:'<p class="dk-gap">指數未提供。</p>'}<h3>匯率</h3>${fxs.length?`<div class="dk-grid">${fxs.map(x=>series(x,4)).join('')}</div>`:'<p class="dk-gap">匯率未提供。</p>'}<h3>各市場個股覆蓋</h3><p class="dk-meta">下表是目錄裡的檔數與資料日分布，不是漲跌幅排行，也不是推薦名單。</p><div class="tw"><table class="t"><thead><tr><th class="l">市場</th><th class="l">檔數</th><th class="l">資料交易日分布</th><th class="l">抓取時間</th><th class="l">來源</th></tr></thead><tbody>${mkt}</tbody></table></div><p style="margin-top:8px"><a class="btn" href="#/global">開啟既有全球市場頁</a> <a class="btn" href="#/screen">開啟選股篩選</a></p></section>
-  <section class="dk-sec" aria-labelledby="ind-h"><h2 id="ind-h">產業資訊與事件對應</h2><p class="dk-lead">台股產業名稱與全球個股產業名稱不是同一套分類，只並列、不比較強弱。事件列的產業來自公告公司在目錄中的產業欄。</p><h3>重大訊息對到的產業</h3><p class="dk-meta">依則數排列是為了閱讀，不是看好程度。來源 <a href="data/all.json">data/all.json</a>，發言日 ${esc(newsDays.join('、')||'未提供')}，抓取 ${esc(meta.built||'未提供')}（台北）。</p>${indTbl?`<div class="tw"><table class="t"><thead><tr><th class="l">產業</th><th>公告則數</th><th>公司數</th></tr></thead><tbody>${indTbl}</tbody></table></div>`:'<p class="dk-gap">沒有可對應的產業。</p>'}<h3>最近公告（最多 8 則）</h3>${ev||'<p class="dk-gap">重大訊息未提供。</p>'}<p><a class="btn" href="#/news">看重大訊息全文</a></p><h3>上市櫃產業檔數</h3><div class="indg">${twTop||'<p class="dk-gap">未提供。</p>'}</div><h3>全球個股產業檔數</h3><p class="dk-meta">這組名稱來自全球個股的 i 欄，與上市櫃產業分類不同。</p><div class="indg">${gTop||'<p class="dk-gap">未提供。</p>'}</div></section>
-  <section class="dk-sec" aria-labelledby="w-h"><h2 id="w-h">自選標的</h2><p class="dk-lead">名單只存在這台瀏覽器。可以新增、移除、重新整理後保留，也可以清除。不接券商，不記錄股數、成本或身分資料。</p><form id="wForm" class="dk-form"><label for="wInput">請輸入完整代號</label><div class="dk-row"><input id="wInput" class="dk-input" type="text" maxlength="16" autocomplete="off" placeholder="例如 2330、0050、AAPL" enterkeyhint="done"><button class="btn primary" type="submit">加入</button><button class="btn" id="wClear" type="button">清除全部</button></div><p id="wStatus" class="dk-meta" role="status" aria-live="polite"></p></form><div id="wList" class="dk-watch"></div></section></div>`}
-function bindDash(){WARM=false;const form=$('#wForm');const status=t=>{const n=$('#wStatus');if(n)n.textContent=t};const paint=()=>{const box=$('#wList');if(!box)return;const a=loadW();if(!a.length){box.innerHTML='<p class="dk-gap">自選是空的。輸入代號後按加入。</p>';return}box.innerHTML=a.map(c=>{const x=M[c];if(!x)return `<article class="dk-witem" data-code="${esc(c)}"><div><b>${esc(c)}</b><p class="dk-gap">本站資料未提供此代號，沒有價格與走勢。</p></div><button type="button" class="btn" data-rm="${esc(c)}">移除</button></article>`;const day=x.g?(x.d||'未提供'):(x.id||'未提供');const built=x.g?((D.meta.g&&D.meta.g.built)||D.meta.built):D.meta.built;const src=x.g?srcLinks([['Yahoo Finance','https://finance.yahoo.com/quote/'+encodeURIComponent(x.c)],['本站目錄','data/all.json']]):srcLinks(x.m==='上櫃'?[['證券櫃檯買賣中心','https://www.tpex.org.tw/'],['個股頁','#/s/'+encodeURIComponent(x.c)]]:[['臺灣證券交易所','https://www.twse.com.tw/'],['個股頁','#/s/'+encodeURIComponent(x.c)]]);return `<article class="dk-witem" data-code="${esc(c)}"><div><b><a href="#/s/${encodeURIComponent(x.c)}">${esc(x.c)} ${esc(x.n)}</a></b> <span class="dk-meta">${esc(x.m)}・${esc(x.i||'產業未提供')}</span><p class="dk-px">${numOrGap(x.p,2)}${x.cur?' '+esc(x.cur):''} <small class="${cls(x.cp)}">${x.cp==null?'漲跌未提供':sg(x.cp)+'%'}</small></p><p class="dk-meta">資料交易日 ${esc(day)}${x.tz?'（'+esc(tzl(x.tz))+'）':x.g?'':'（欄位 id）'}。${esc(dayLag(day,''))}</p><p class="dk-meta">抓取時間 ${esc(built||'未提供')}（台北）。狀態：${esc(x.st||(x.g?'檔案未提供盤別':'收盤資料'))}。來源：${src}。</p><div class="w-spark" data-c="${esc(c)}"><p class="dk-meta">走勢載入中…</p></div></div><button type="button" class="btn" data-rm="${esc(c)}">移除</button></article>`}).join('');box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{saveW(loadW().filter(x=>x!==b.getAttribute('data-rm')));WARM=false;$('#wClear').textContent='清除全部';status('已移除 '+b.getAttribute('data-rm'));paint()});a.forEach(c=>{if(!M[c])return;fetch('data/h/'+encodeURIComponent(c)+'.json?v='+encodeURIComponent(D.meta.built)).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(h=>{const el=[...box.querySelectorAll('.w-spark')].find(n=>n.getAttribute('data-c')===c);if(el)el.innerHTML=dkSpark(h.h)}).catch(()=>{const el=[...box.querySelectorAll('.w-spark')].find(n=>n.getAttribute('data-c')===c);if(el)el.innerHTML='<p class="dk-gap">走勢未提供（歷史檔讀取失敗）</p>'})})};if(form)form.onsubmit=e=>{e.preventDefault();const raw=$('#wInput').value;const c=canonCode(raw);if(!c){status('請輸入代號');return}if(c.length>16){status('代號過長，未加入');return}let a=loadW();if(a.includes(c)){status(c+' 已在自選');$('#wInput').value='';return}if(a.length>=WMAX){status('自選已達 '+WMAX+' 檔，請先移除再加入');return}a=[c,...a];saveW(a);$('#wInput').value='';status(M[c]?('已加入 '+c+' '+M[c].n):('已加入 '+c+'。本站沒有此代號，價格顯示未提供'));paint()};const clr=$('#wClear');if(clr)clr.onclick=()=>{if(!loadW().length){status('自選本來就是空的');return}if(!WARM){WARM=true;clr.textContent='確定清除自選';status('再按一次才會清除這台瀏覽器的自選');return}saveW([]);WARM=false;clr.textContent='清除全部';status('已清除自選');paint()};paint()}
+  const side=sorted.slice(0,8).map(z=>{
+    const x=M[z.c];const ind=x&&x.i?x.i:'';
+    let how='產業未提供';
+    if(ind){const blob=(z.s||'')+(z.x||'');how=ind.length>=3&&blob.includes(ind)?`產業「${ind}」出現在公告文字，這是關鍵字配對，不是因果`:`產業分類「${ind}」。公告沒有這串名稱，只依公司資料對應，不是因果`}
+    return `<article class="dk-note"><span class="dk-tag">${esc(ind||'產業未提供')}</span> <a href="#/s/${encodeURIComponent(z.c)}">${esc(z.c)} ${esc(z.n||'')}</a><p style="margin:4px 0">${esc(z.s||'主旨未提供')}</p><p class="dk-meta">${esc(how)}。${esc(z.d||'日期未提供')} ${esc(z.t||'')}。來源：<a href="https://mops.twse.com.tw/" target="_blank" rel="noopener">公開資訊觀測站</a>。抓取 ${esc(meta.built||'未提供')}（台北）。</p></article>`;
+  }).join('')||'<p class="dk-gap">重大訊息未提供。</p>';
+  const indTiles=indRows.slice(0,12).map((i,n)=>`<a class="toneb-${toneAt(n)}" href="${i==='未提供'?'#/news':'#/ind/'+encodeURIComponent(i)}"><span class="bar" aria-hidden="true"></span>${esc(i)}<small>${fi(byInd[i].length)} 則／${fi(new Set(byInd[i].map(z=>z.c)).size)} 家</small></a>`).join('');
+  const twInd={};S.filter(x=>!x.g).forEach(x=>{twInd[x.i]=(twInd[x.i]||0)+1});
+  const twTop=Object.keys(twInd).sort((a,b)=>twInd[b]-twInd[a]).slice(0,8).map((i,n)=>`<a href="#/ind/${encodeURIComponent(i)}">${esc(i)}<small>${twInd[i]} 檔</small></a>`).join('');
+  const fresh=`<p class="dk-warn">本頁讀取時間 ${esc(TP_CLOCK)}（台北，${esc(TP_WEEK)}）。個股與重大訊息抓取時間 ${esc(meta.built||'未提供')}（台北）。${esc(qAge)} 全球指數檔抓取時間 ${esc(gBuilt||'未提供')}（台北）。${esc(gAge)} 這些都是已寫入的快照，不是盤中即時。紅漲、綠跌，並寫出漲／跌與正負號。</p>`;
+  return `<div class="dk">
+  <section class="dk-sec" aria-labelledby="home-h"><h2 id="home-h">股票王市場主控台</h2><p class="dk-lead">資訊彙整，不構成投資建議，不提供買賣點、報酬保證或個人建議。色塊只幫分區，意思寫在文字上。沒有模型產生的解讀。</p>${ad3()}${fresh}</section>
+  <section aria-labelledby="ev-h"><h2 id="ev-h" class="dk-lead" style="font-size:15px;font-weight:800;color:#1f2933">重大訊息</h2><div class="dk-strip">${strip}</div></section>
+  <div class="dk-board">
+    ${feature}
+    <section class="dk-panel" aria-labelledby="idx-h"><h2 id="idx-h">全球指數</h2><p class="dk-lead">小圖只畫檔內收盤。點數不足就留白，日期不同不改成同一天。</p>${GX_ERR?'<p class="dk-err">全球指數檔載入失敗。請稍後重新整理。</p>':''}${rest.length?`<div class="dk-mini-grid">${rest.map((x,i)=>mini(x,i,2)).join('')}</div>`:'<p class="dk-gap">其他指數未提供。</p>'}</section>
+    <aside class="dk-side" aria-labelledby="side-h"><h2 id="side-h">產業與公告</h2><p class="dk-lead">產業取自公告公司的分類。可對到 ${esc(String(news.length-unmatched))} / ${esc(String(news.length||'未提供'))} 則，涉及 ${esc(String(companies.size))} 家。不是風險評分。</p>${statusHtml}${side}<p><a class="btn" href="#/news">看重大訊息全文</a></p></aside>
+  </div>
+  <section class="dk-panel" aria-labelledby="fx-h"><h2 id="fx-h">匯率</h2>${fxs.length?`<div class="dk-fx">${fxs.map((x,i)=>mini(x,i+3,4)).join('')}</div>`:'<p class="dk-gap">匯率未提供。</p>'}</section>
+  <div class="dk-split">
+    <section class="dk-panel" aria-labelledby="ind-h"><h2 id="ind-h">產業</h2><p class="dk-lead">依公告則數排列是為了閱讀，不是看好程度。來源 <a href="data/all.json">data/all.json</a>，發言日 ${esc(newsDays.join('、')||'未提供')}，抓取 ${esc(meta.built||'未提供')}（台北）。台股分類與全球分類不是同一套。</p><div class="dk-ind">${indTiles||'<p class="dk-gap">沒有可對應的產業。</p>'}</div><h3 style="margin-top:10px">上市櫃檔數</h3><div class="dk-ind">${twTop||'<p class="dk-gap">未提供。</p>'}</div></section>
+    <section class="dk-panel" aria-labelledby="w-h"><h2 id="w-h">自選標的</h2><p class="dk-lead">名單只存在這台瀏覽器。可以新增、移除、重新整理後保留，也可以清除。不接券商，不記錄股數、成本或身分資料。</p><form id="wForm" class="dk-form"><label for="wInput">請輸入完整代號</label><div class="dk-row"><input id="wInput" class="dk-input" type="text" maxlength="16" autocomplete="off" placeholder="例如 2330、0050、AAPL" enterkeyhint="done"><button class="btn primary" type="submit">加入</button><button class="btn" id="wClear" type="button">清除全部</button></div><p id="wStatus" class="dk-meta" role="status" aria-live="polite"></p></form><div id="wList" class="dk-watch"></div></section>
+  </div>
+  <section class="dk-panel"><h2>各市場覆蓋與資料缺口</h2><p class="dk-lead">下表是目錄裡的檔數與資料日，不是漲跌幅排行，也不是推薦名單。</p><div class="tw"><table class="t"><thead><tr><th class="l">市場</th><th class="l">檔數</th><th class="l">資料交易日分布</th><th class="l">抓取時間</th><th class="l">來源</th></tr></thead><tbody>${mkt}</tbody></table></div><div class="dk-warn" style="margin-top:10px"><b>資料缺口</b><ul>${gaps.map(item=>`<li>${esc(item)}</li>`).join('')}</ul></div><p style="margin-top:8px"><a class="btn" href="#/global">全球市場頁</a> <a class="btn" href="#/screen">選股篩選</a></p></section>
+  </div>`;
+}
+function bindDash(){WARM=false;const form=$('#wForm');const status=t=>{const n=$('#wStatus');if(n)n.textContent=t};const paint=()=>{const box=$('#wList');if(!box)return;const a=loadW();if(!a.length){box.innerHTML='<p class="dk-gap">自選是空的。輸入代號後按加入。</p>';return}box.innerHTML=a.map(c=>{const x=M[c];if(!x)return `<article class="dk-witem" data-code="${esc(c)}"><div><b>${esc(c)}</b><p class="dk-gap">本站資料未提供此代號，沒有價格與走勢。</p></div><button type="button" class="btn" data-rm="${esc(c)}">移除</button></article>`;const day=x.g?(x.d||'未提供'):(x.id||'未提供');const built=x.g?((D.meta.g&&D.meta.g.built)||D.meta.built):D.meta.built;const src=x.g?srcLinks([['Yahoo Finance','https://finance.yahoo.com/quote/'+encodeURIComponent(x.c)],['本站目錄','data/all.json']]):srcLinks(x.m==='上櫃'?[['證券櫃檯買賣中心','https://www.tpex.org.tw/'],['個股頁','#/s/'+encodeURIComponent(x.c)]]:[['臺灣證券交易所','https://www.twse.com.tw/'],['個股頁','#/s/'+encodeURIComponent(x.c)]]);return `<article class="dk-witem" data-code="${esc(c)}"><div><b><a href="#/s/${encodeURIComponent(x.c)}">${esc(x.c)} ${esc(x.n)}</a></b> <span class="dk-meta">${esc(x.m)}・${esc(x.i||'產業未提供')}</span><p class="dk-px">${numOrGap(x.p,2)}${x.cur?' '+esc(x.cur):''} <small class="dk-badge ${dirBits(x.cp).cls}">${esc(dirBits(x.cp).text)}</small></p><p class="dk-meta">資料交易日 ${esc(day)}${x.tz?'（'+esc(tzl(x.tz))+'）':x.g?'':'（欄位 id）'}。${esc(dayLag(day,''))}</p><p class="dk-meta">抓取時間 ${esc(built||'未提供')}（台北）。狀態：${esc(x.st||(x.g?'檔案未提供盤別':'收盤資料'))}。來源：${src}。</p><div class="w-spark" data-c="${esc(c)}"><p class="dk-meta">走勢載入中…</p></div></div><button type="button" class="btn" data-rm="${esc(c)}">移除</button></article>`}).join('');box.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{saveW(loadW().filter(x=>x!==b.getAttribute('data-rm')));WARM=false;$('#wClear').textContent='清除全部';status('已移除 '+b.getAttribute('data-rm'));paint()});a.forEach(c=>{if(!M[c])return;fetch('data/h/'+encodeURIComponent(c)+'.json?v='+encodeURIComponent(D.meta.built)).then(r=>{if(!r.ok)throw new Error(r.status);return r.json()}).then(h=>{const el=[...box.querySelectorAll('.w-spark')].find(n=>n.getAttribute('data-c')===c);if(el)el.innerHTML=dkSpark(h.h)}).catch(()=>{const el=[...box.querySelectorAll('.w-spark')].find(n=>n.getAttribute('data-c')===c);if(el)el.innerHTML='<p class="dk-gap">走勢未提供（歷史檔讀取失敗）</p>'})})};if(form)form.onsubmit=e=>{e.preventDefault();const raw=$('#wInput').value;const c=canonCode(raw);if(!c){status('請輸入代號');return}if(c.length>16){status('代號過長，未加入');return}let a=loadW();if(a.includes(c)){status(c+' 已在自選');$('#wInput').value='';return}if(a.length>=WMAX){status('自選已達 '+WMAX+' 檔，請先移除再加入');return}a=[c,...a];saveW(a);$('#wInput').value='';status(M[c]?('已加入 '+c+' '+M[c].n):('已加入 '+c+'。本站沒有此代號，價格顯示未提供'));paint()};const clr=$('#wClear');if(clr)clr.onclick=()=>{if(!loadW().length){status('自選本來就是空的');return}if(!WARM){WARM=true;clr.textContent='確定清除自選';status('再按一次才會清除這台瀏覽器的自選');return}saveW([]);WARM=false;clr.textContent='清除全部';status('已清除自選');paint()};paint()}
